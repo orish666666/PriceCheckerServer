@@ -1,0 +1,9 @@
+Flask~=3.1.1
+pip
+dotenv
+requests
+ebaysdk
+prophet
+plotly
+pandas
+matplotlib
