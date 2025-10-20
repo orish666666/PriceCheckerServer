@@ -2,8 +2,10 @@ Flask~=3.1.1
 pip
 dotenv
 requests
-ebaysdk
-prophet
+ebaysdk~=2.2.0
+prophet~=1.1.7
 plotly
-pandas
-matplotlib
+pandas~=2.3.2
+matplotlib~=3.9.4
+python-dotenv~=1.1.1
+numpy~=2.0.2
