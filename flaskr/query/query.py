@@ -54,3 +54,4 @@ def delete_predictions():
     connection.commit()
     connection.close()
     
+
