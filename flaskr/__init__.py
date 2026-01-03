@@ -1,7 +1,5 @@
 import os
 import base64
-
-import requests
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from ebaysdk.finding import Connection as Finding
@@ -82,6 +80,7 @@ def create_app():
             })
 
             data = resp.dict()
+            print(data)
             items = data.get('searchResult', {})
 
             if not items:

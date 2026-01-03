@@ -1,85 +1,81 @@
 from io import BytesIO
-
 import pandas as pd
 from prophet import Prophet
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
-
-import numpy as np
-
 from flaskr.query.query import get_products, insert_predictions, delete_predictions
 
 
 def main():
     data_to_insert = []
     data = get_products()
+
     df = pd.DataFrame(data, columns=['category_id', 'category_name', 'price', 'date'])
+
     periods = {
-        "h": 24,
-        "D": 7,
-        "W": 4,
-        "ME": 12
+        "h": 24,  # day
+        "D": 7,   # week
+        "W": 4,   # month
+        "ME": 12  # year
     }
 
-    # grouping the data by each category id
     grouped_data = df.groupby('category_id')
 
     for category_id, group_df in grouped_data:
+        # prepare data
+        df_train = group_df[['price', 'date']].copy()
+        df_train.columns = ['y', 'ds']
+        df_train['y'] = pd.to_numeric(df_train['y'], errors='coerce')
+        df_train['ds'] = pd.to_datetime(df_train['ds'], utc=True).dt.tz_localize(None)
+        df_train = df_train.dropna().sort_values('ds')
+
+        if df_train.empty:
+            continue
+
+        category_name = group_df['category_name'].iloc[0]
+
         for freq, period in periods.items():
-            print("Predicting for category:", category_id, "on", freq)
-            train_data = []
-            category_name = ""
-            # get only the price and date on the products
-            for i, row in group_df.iterrows():
-                if category_name == "" and row.category_name:
-                    category_name = row.category_name
-                train_data.append((row.price, row.date))
-
-            df_train = pd.DataFrame(train_data, columns=['y', 'ds'])
-
-            # Apply log transform to prevent negative values
-            df_train['y'] = df_train['y'].astype(float)
-            df_train['y'] = df_train['y'].apply(lambda x: max(x, 1))  # avoid log(0) or negative
-            df_train['y'] = np.log(df_train['y'])
-
-            df_train['ds'] = pd.to_datetime(df_train['ds'], utc=True)
-
-            # prophet doesn't like timezone in the date so just localizing it and removing it
-            df_train['ds'] = df_train['ds'].dt.tz_localize(None)
-
-            m = Prophet()
+            m = Prophet(
+                yearly_seasonality=False,
+                weekly_seasonality=False,
+                daily_seasonality=False,
+                changepoint_prior_scale=0.05
+            )
             m.fit(df_train)
 
-            # predict a specific period of time
+            # predict
             future = m.make_future_dataframe(periods=period, freq=freq)
             forecast = m.predict(future)
-            last_date = df_train['ds'].max()
 
-            # get only prediction of a specific period of time
-            future_predictions = forecast[forecast['ds'] > last_date]
+            # filter to show only the future prediction
+            last_historical_date = df_train['ds'].max()
+            plot_data = forecast[forecast['ds'] >= last_historical_date]
 
-            dates = future_predictions['ds']
-            # Apply exponential but clip extreme predictions
-            prices = np.exp(future_predictions['yhat'].clip(upper=9.6))  # limit to 10,000
+            # generate the graph
+            fig, ax = plt.subplots(figsize=(10, 5))
 
-            # create the graph
-            plt.figure(figsize=(10, 5))
-            plt.plot(dates, prices)
+            # create the line
+            ax.plot(plot_data['ds'], plot_data['yhat'].clip(lower=0),
+                    color='#007bff', linewidth=2, marker='o', markersize=4)
 
-            plt.xlabel('Date (YYYY-MM)')
-            plt.ylabel('Price ($)')
-            plt.ticklabel_format(style='plain', axis='y')  # disable scientific notation on y-axis
+            # prevent overlapping text
+            locator = mdates.AutoDateLocator()
+            ax.xaxis.set_major_locator(locator)
+            ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(locator))
 
-            # add ',' to make numbers more readable
-            plt.gca().yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'{int(x):,}'))
+            # format price to $
+            ax.yaxis.set_major_formatter(mticker.StrMethodFormatter('${x:,.0f}'))
 
-            plt.title(f'{period}-{freq} Graph')
-            plt.xticks(rotation=20)
+            plt.title(f"Price Prediction: {category_name} ({period}{freq})")
+            plt.grid(True, linestyle='--', alpha=0.5)
             plt.tight_layout()
 
+            # save
             image_raw = BytesIO()
             plt.savefig(image_raw, format='png')
             image_raw.seek(0)
+            plt.close(fig)
 
             data_to_insert.append((str(category_id), category_name, freq, image_raw.getvalue()))
 

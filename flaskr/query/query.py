@@ -2,7 +2,7 @@ import sqlite3
 
 
 def get_categories():
-    connection = sqlite3.connect(f"products.sqlite")
+    connection = sqlite3.connect(f"products.db")
     sql_query = f""" SELECT DISTINCT category_id, category_name FROM predictions """
     res = connection.execute(sql_query).fetchall()
     connection.commit()
@@ -11,7 +11,7 @@ def get_categories():
 
 
 def get_prediction_graph_by_id(category_id, freq):
-    connection = sqlite3.connect(f"products.sqlite")
+    connection = sqlite3.connect(f"products.db")
     sql_query = f""" SELECT DISTINCT image_graph, category_name FROM predictions
                      WHERE category_id = {category_id} AND frequency = '{freq}'"""
     res = connection.execute(sql_query).fetchone()
@@ -21,7 +21,7 @@ def get_prediction_graph_by_id(category_id, freq):
 
 
 def insert_products(data_to_insert):
-    connection = sqlite3.connect(f"products.sqlite")
+    connection = sqlite3.connect(f"products.db")
     sql_insert = """ INSERT OR REPLACE INTO products (id, category_id, name, price, date, category_name)
                      VALUES (?,?,?,?,?,?) """
     connection.executemany(sql_insert, data_to_insert)
@@ -30,7 +30,7 @@ def insert_products(data_to_insert):
 
 
 def get_products():
-    connection = sqlite3.connect(f"products.sqlite")
+    connection = sqlite3.connect(f"products.db")
     sql_query = """ SELECT category_id, category_name, price, date FROM products """
     res = connection.execute(sql_query).fetchall()
     connection.commit()
@@ -39,7 +39,7 @@ def get_products():
 
 
 def insert_predictions(data_to_insert):
-    connection = sqlite3.connect(f"products.sqlite")
+    connection = sqlite3.connect(f"products.db")
     sql_insert = """ INSERT OR IGNORE INTO predictions (category_id, category_name, frequency, image_graph)
                      VALUES (?,?,?,?) """
     connection.executemany(sql_insert, data_to_insert)
@@ -48,8 +48,15 @@ def insert_predictions(data_to_insert):
 
 
 def delete_predictions():
-    connection = sqlite3.connect(f"products.sqlite")
+    connection = sqlite3.connect(f"products.db")
     sql_delete = """ DELETE FROM predictions """
     connection.execute(sql_delete)
+    connection.commit()
+    connection.close()
+
+if __name__ == "__main__":
+    connection = sqlite3.connect(f"products.db")
+    sql_query = """ DELETE FROM products WHERE category_id = '58058'; """
+    res = connection.execute(sql_query)
     connection.commit()
     connection.close()
